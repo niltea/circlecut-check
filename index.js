@@ -39,7 +39,7 @@ const checkFrameColor = ([imageData, image], startX, startY, width, height) => {
     }
     checkArrayY.push(checkArrayX.every(value => value === true))
   }
-  return [checkArrayY.every(value => value === true), resStr];
+  return [checkArrayY.every(value => value === true), resStr, errorCount];
 };
 // 左上枠に記入がないか確認
 const checkLTFrame = ([imageData, image]) => {
@@ -71,7 +71,7 @@ const checkLTFrame = ([imageData, image]) => {
     }
     checkArrayY.push(checkArrayX.every(value => value === true))
   }
-  return [checkArrayY.every(value => value === true), resStr];
+  return [checkArrayY.every(value => value === true), resStr, errorCount];
 };
 
 async function checkFrame(fileName) {
@@ -106,12 +106,20 @@ async function checkFrame(fileName) {
   const innerRight = checkFrameColor(checkImageData, outerBorderWidth + LTboxWidth, outerBorderWidth, innerBorderWidth, LTboxHeight);
   // console.log(`innerRight: ${innerRight}`);
 
-  const isOuterOK = [upper[0], lower[0], left[0], right[0], innerLower[0], innerRight[0]].every(value => value === true)
-  const outerRes = upper[1] + lower[1] + left[1] + right[1] + innerLower[1] + innerRight[1];
-  // console.log(`isOuterOK: ${isOuterOK}`);
+  const isFrameOK = [upper[0], lower[0], left[0], right[0], innerLower[0], innerRight[0]].every(value => value === true)
+  const frameErrPixels = upper[1] + lower[1] + left[1] + right[1] + innerLower[1] + innerRight[1];
+  const frameErrCount = upper[2] + lower[2] + left[2] + right[2] + innerLower[2] + innerRight[2];
+  // console.log(`isFrameOK: ${isFrameOK}`);
 
-  const isLTFrameOK = checkLTFrame(checkImageData);
-  return [isOuterOK, outerRes, isLTFrameOK[0], isLTFrameOK[1]];
+  const LTFrameResult = checkLTFrame(checkImageData);
+  return {
+      isFrameOK,
+      isLTOK: LTFrameResult[0],
+      frameErrPixels,
+      frameErrCount,
+      LTFrameErrPixels: LTFrameResult[1],
+      LTFrameErrCount: LTFrameResult[2]
+  };
 }
 async function main() {
   // '/cut/1sp-frame.png'
@@ -122,9 +130,9 @@ async function main() {
 
   const result = await Promise.all(files.map(async (file) => {
     const checkResult = await checkFrame(path + '/' + file);
-    return `${file},${checkResult[0]},${checkResult[2]},"${checkResult[1]}","${checkResult[3]}"`;
+    return `${file},${checkResult.isFrameOK},${checkResult.isLTOK},"${checkResult.frameErrPixels}",${checkResult.frameErrCount},"${checkResult.LTFrameErrPixels}",${checkResult.LTFrameErrCount}`;
   }));
-  const header = 'fileName,isFrameOK,NGFrame,NGPixel(outer),NGPixel(inner)\n';
+  const header = 'fileName,isFrameOK,isInnerFrameOK,NGPixel(outer),NGCount(outer),NGPixel(inner),NGCount(inner)\n';
   console.log(header + result.join('\n'));
   fs.writeFile( "result.csv" , header + result.join('\n') )
 }
